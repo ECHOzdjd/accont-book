@@ -15,7 +15,7 @@ mybatis:
   type-aliases-package: com.shenzhewei.accont_book.model.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
 # Server Configuration
 server:
@@ -25,3 +25,7 @@ server:
 logging:
   level:
     com.shenzhewei.accont_book: debug
+    com.shenzhewei.accont_book.repository: debug
+  charset:
+    console: UTF-8
+    file: UTF-8

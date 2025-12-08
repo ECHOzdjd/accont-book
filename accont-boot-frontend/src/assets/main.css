@@ -1,0 +1,283 @@
+/* 全局样式变量 - 优雅笔记本风格 */
+:root {
+  /* Warm Palette */
+  --bg-paper: #fefdfb; /* 信纸白 */
+  --bg-card: #ffffff;
+  --text-main: #3d3020; /* 深褐主标题 */
+  --text-body: #6b5d52; /* 中褐正文 */
+  --text-muted: #9ca3af;
+
+  --accent-brown: #5a4a3f;
+  --accent-gold: #c17c4a;
+
+  --primary-color: var(--accent-gold);
+
+  /* 阴影与边框 */
+  --shadow-soft: 0 10px 30px -10px rgba(90, 74, 63, 0.08);
+  --border-light: 1px solid #f0eae6;
+
+  /* 字体 */
+  --font-serif: 'Noto Serif SC', serif;
+  --font-sans: 'Noto Sans SC', sans-serif;
+
+  --radius-card: 16px;
+
+  /* 兼容原有变量名以防组件报错，但映射到新颜色 */
+  --el-color-primary: var(--accent-gold);
+  --el-color-success: #5a9e78; /* 柔和绿 */
+  --el-color-danger: #d66a5a; /* 柔和红 */
+  --el-text-color-primary: var(--text-main);
+  --el-text-color-regular: var(--text-body);
+
+  /* 渐变占位（移除原有高饱和渐变） */
+  --primary-gradient: linear-gradient(135deg, #c17c4a 0%, #a66336 100%);
+  --success-gradient: linear-gradient(135deg, #5a9e78 0%, #468560 100%);
+  --danger-gradient: linear-gradient(135deg, #d66a5a 0%, #bf5242 100%);
+}
+
+/* Reset & Global */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-paper);
+  color: var(--text-body);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* 纸张噪点纹理 */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* 标题字体覆盖 */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.card-title,
+.stat-value,
+.logo-text {
+  font-family: var(--font-serif);
+  color: var(--text-main);
+}
+
+/* 统计卡片 */
+.stat-card {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  padding: 24px 32px;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid transparent;
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(90, 74, 63, 0.12);
+  border-color: rgba(193, 124, 74, 0.1);
+}
+
+/* 左侧装饰线 */
+.stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #e5e7eb;
+  transition: background 0.3s ease;
+}
+
+.stat-card.primary::before {
+  background: var(--accent-gold);
+}
+.stat-card.success::before {
+  background: var(--el-color-danger); /* 红涨 */
+}
+.stat-card.danger::before {
+  background: var(--el-color-success); /* 绿跌 */
+}
+
+.stat-card .stat-icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fdfbf7;
+  border-radius: 12px;
+  color: var(--accent-brown);
+  margin-right: 20px;
+}
+
+.stat-card.primary .stat-icon {
+  color: var(--accent-gold);
+  background: rgba(193, 124, 74, 0.08);
+}
+.stat-card.success .stat-icon {
+  color: var(--el-color-danger);
+  background: rgba(214, 106, 90, 0.08);
+}
+.stat-card.danger .stat-icon {
+  color: var(--el-color-success);
+  background: rgba(90, 158, 120, 0.08);
+}
+
+.stat-value {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  letter-spacing: 0.5px;
+}
+
+/* 内容卡片 */
+.content-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  border: var(--border-light);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.content-card:hover {
+  box-shadow: 0 20px 40px -12px rgba(90, 74, 63, 0.1);
+}
+
+.card-header {
+  padding: 24px 32px;
+  border-bottom: 1px solid #f5f0eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 700;
+  position: relative;
+  padding-left: 14px;
+}
+
+.card-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  background-color: var(--accent-gold);
+  border-radius: 2px;
+}
+
+.card-body {
+  padding: 24px 32px;
+}
+
+/* Element Plus 覆盖 */
+.el-button--primary {
+  background-color: var(--accent-gold) !important;
+  border-color: var(--accent-gold) !important;
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+.el-button--primary.is-link {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  color: var(--accent-gold) !important;
+}
+.el-button--primary.is-link:hover {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  color: #a66336 !important;
+}
+.el-button--primary:not(.is-link):hover {
+  background-color: #a66336 !important;
+  border-color: #a66336 !important;
+}
+
+.el-table {
+  --el-table-header-bg-color: #fcfaf8;
+  --el-table-header-text-color: var(--text-body);
+  --el-table-row-hover-bg-color: #fdfbf7;
+  font-family: var(--font-sans);
+}
+
+.tag.income {
+  color: var(--el-color-danger);
+  background: rgba(214, 106, 90, 0.08);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+}
+
+.tag.expense {
+  color: var(--el-color-success);
+  background: rgba(90, 158, 120, 0.08);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+}
+
+.amount.income {
+  color: var(--el-color-danger);
+  font-family: var(--font-serif);
+  font-weight: 700;
+}
+.amount.expense {
+  color: var(--el-color-success);
+  font-family: var(--font-serif);
+  font-weight: 700;
+}
+
+/* 动画 - 淡入 */
+.animate-in {
+  animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
