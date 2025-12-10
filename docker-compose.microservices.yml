@@ -1,0 +1,199 @@
+version: '3.8'
+
+services:
+  # ==================== 中间件 ====================
+
+  mysql:
+    image: mysql:8.0
+    container_name: accont-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: accont_book
+      MYSQL_USER: accont
+      MYSQL_PASSWORD: accont123
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - accont-network
+
+  nacos:
+    image: nacos/nacos-server:v2.3.0
+    container_name: accont-nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      SPRING_DATASOURCE_PLATFORM: ""
+      JVM_XMS: 256m
+      JVM_XMX: 256m
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8848/nacos/" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - accont-network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: accont-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - accont-network
+
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.7
+    container_name: accont-sentinel
+    restart: unless-stopped
+    ports:
+      - "8858:8858"
+    networks:
+      - accont-network
+
+  # ==================== 微服务 ====================
+
+  gateway-service:
+    build:
+      context: ./microservices/gateway-service
+      dockerfile: Dockerfile
+    container_name: accont-gateway
+    restart: unless-stopped
+    environment:
+      NACOS_SERVER: nacos:8848
+    ports:
+      - "9000:9000"
+    depends_on:
+      nacos:
+        condition: service_healthy
+    networks:
+      - accont-network
+
+  user-service:
+    build:
+      context: ./microservices/user-service
+      dockerfile: Dockerfile
+    container_name: accont-user
+    restart: unless-stopped
+    environment:
+      NACOS_SERVER: nacos:8848
+      MYSQL_HOST: mysql
+      MYSQL_USER: accont
+      MYSQL_PASSWORD: accont123
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    networks:
+      - accont-network
+
+  asset-service:
+    build:
+      context: ./microservices/asset-service
+      dockerfile: Dockerfile
+    # 移除 container_name 以支持多实例
+    restart: unless-stopped
+    environment:
+      NACOS_SERVER: nacos:8848
+      MYSQL_HOST: mysql
+      MYSQL_USER: accont
+      MYSQL_PASSWORD: accont123
+    # 不固定端口映射，让 Docker 自动分配
+    # 通过 Nacos 服务发现访问
+    expose:
+      - "8082"
+    deploy:
+      replicas: 3 # 启动3个实例
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    networks:
+      - accont-network
+
+  transaction-service:
+    build:
+      context: ./microservices/transaction-service
+      dockerfile: Dockerfile
+    container_name: accont-transaction
+    restart: unless-stopped
+    environment:
+      NACOS_SERVER: nacos:8848
+      MYSQL_HOST: mysql
+      MYSQL_USER: accont
+      MYSQL_PASSWORD: accont123
+      RABBITMQ_HOST: rabbitmq
+      SENTINEL_DASHBOARD: sentinel-dashboard:8858
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - accont-network
+
+  statistics-service:
+    build:
+      context: ./microservices/statistics-service
+      dockerfile: Dockerfile
+    container_name: accont-statistics
+    restart: unless-stopped
+    environment:
+      NACOS_SERVER: nacos:8848
+      MYSQL_HOST: mysql
+      MYSQL_USER: accont
+      MYSQL_PASSWORD: accont123
+      RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - accont-network
+
+volumes:
+  mysql_data:
+  rabbitmq_data:
+
+
+networks:
+  accont-network:
+    driver: bridge

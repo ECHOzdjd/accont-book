@@ -99,4 +99,53 @@ export const deleteTransaction = (id) => {
   return api.delete(`/transactions/${id}`)
 }
 
+// ============ 统计 API ============
+
+/**
+ * 获取当月概览
+ */
+export const getCurrentMonthSummary = (userId = DEFAULT_USER_ID) => {
+  return api.get(`/stats/summary/${userId}`)
+}
+
+/**
+ * 获取月度统计（最近N个月）
+ */
+export const getMonthlyStatistics = (userId = DEFAULT_USER_ID, months = 6) => {
+  return api.get(`/stats/monthly/${userId}?months=${months}`)
+}
+
+/**
+ * 获取分类统计
+ */
+export const getCategoryStatistics = (userId = DEFAULT_USER_ID, month, type) => {
+  let url = `/stats/category/${userId}?`
+  if (month) url += `month=${month}&`
+  if (type) url += `type=${type}`
+  return api.get(url)
+}
+
+// ============ 用户 API ============
+
+/**
+ * 用户登录
+ */
+export const login = (username, password) => {
+  return api.post('/users/login', { username, password })
+}
+
+/**
+ * 用户注册
+ */
+export const register = (username, password) => {
+  return api.post('/users/register', { username, password })
+}
+
+/**
+ * 获取用户信息
+ */
+export const getUserById = (id) => {
+  return api.get(`/users/${id}`)
+}
+
 export default api
