@@ -34,3 +34,8 @@ management:
 logging:
   level:
     com.shenzhewei.user: DEBUG
+
+# JWT Configuration
+jwt:
+  secret: accont-book-jwt-secret-key-for-signing-tokens-2024
+  expiration: 86400000  # 24 hours in milliseconds

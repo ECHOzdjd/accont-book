@@ -8,6 +8,7 @@ import com.shenzhewei.user.mapper.UserMapper;
 import com.shenzhewei.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Override
     public UserDTO register(String username, String password) {
@@ -32,9 +34,12 @@ public class UserServiceImpl implements UserService {
             throw new BizException(ResultCode.BIZ_ERROR, "用户名已存在");
         }
 
+        // 使用 BCrypt 加密密码
+        String encodedPassword = passwordEncoder.encode(password);
+
         User user = User.builder()
                 .username(username)
-                .password(password)  // TODO: 实际项目应加密存储
+                .password(encodedPassword)
                 .createTime(LocalDateTime.now())
                 .build();
 
@@ -49,7 +54,8 @@ public class UserServiceImpl implements UserService {
         User user = userMapper.findByUsername(username)
                 .orElseThrow(() -> new BizException(ResultCode.BIZ_ERROR, "用户名或密码错误"));
 
-        if (!password.equals(user.getPassword())) {  // TODO: 实际项目应加密比对
+        // 使用 BCrypt 验证密码
+        if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BizException(ResultCode.BIZ_ERROR, "用户名或密码错误");
         }
 

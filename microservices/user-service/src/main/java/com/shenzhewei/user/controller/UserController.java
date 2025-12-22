@@ -2,7 +2,9 @@ package com.shenzhewei.user.controller;
 
 import com.shenzhewei.common.api.dto.UserDTO;
 import com.shenzhewei.common.core.Result;
+import com.shenzhewei.user.dto.LoginResponse;
 import com.shenzhewei.user.service.UserService;
+import com.shenzhewei.user.util.JwtUtil;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -20,6 +22,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final JwtUtil jwtUtil;
 
     /**
      * 用户注册
@@ -34,9 +37,14 @@ public class UserController {
      * 用户登录
      */
     @PostMapping("/login")
-    public Result<UserDTO> login(@Valid @RequestBody LoginRequest request) {
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         UserDTO user = userService.login(request.getUsername(), request.getPassword());
-        return Result.success(user);
+        
+        // 生成 JWT Token
+        String token = jwtUtil.generateToken(user.getId(), user.getUsername());
+        
+        LoginResponse response = new LoginResponse(token, user);
+        return Result.success(response);
     }
 
     /**

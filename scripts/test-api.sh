@@ -124,6 +124,58 @@ if [ "$ALL_UP" = false ]; then
 fi
 
 # =============================================================================
+# JWT 认证测试
+# =============================================================================
+
+print_header "JWT 认证测试"
+
+# 生成唯一用户名
+JWT_USERNAME="testuser_$(date +%s)"
+JWT_PASSWORD="password123"
+
+print_test "用户注册"
+print_request "POST" "$BASE_URL/api/users/register" "{\"username\": \"$JWT_USERNAME\", \"password\": \"$JWT_PASSWORD\"}"
+RESPONSE=$(curl -s -X POST "$BASE_URL/api/users/register" -H "$CONTENT_TYPE" -d "{\"username\": \"$JWT_USERNAME\", \"password\": \"$JWT_PASSWORD\"}" 2>/dev/null)
+print_response "$RESPONSE"
+if echo "$RESPONSE" | grep -q '"code":200'; then
+    log_pass "code=200"
+else
+    log_fail "用户注册失败"
+fi
+
+print_test "用户登录获取 JWT Token"
+print_request "POST" "$BASE_URL/api/users/login" "{\"username\": \"$JWT_USERNAME\", \"password\": \"$JWT_PASSWORD\"}"
+LOGIN_RESPONSE=$(curl -s -X POST "$BASE_URL/api/users/login" -H "$CONTENT_TYPE" -d "{\"username\": \"$JWT_USERNAME\", \"password\": \"$JWT_PASSWORD\"}" 2>/dev/null)
+print_response "$LOGIN_RESPONSE"
+if echo "$LOGIN_RESPONSE" | grep -q '"token":'; then
+    JWT_TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*"' | sed 's/"token":"//;s/"$//')
+    echo -e "  ${CYAN}→ Token: ${JWT_TOKEN:0:50}...${NC}"
+    log_pass "登录成功并获取 Token"
+else
+    log_fail "登录失败或未返回 Token"
+fi
+
+print_test "重复注册相同用户名 (应失败)"
+print_request "POST" "$BASE_URL/api/users/register" "{\"username\": \"$JWT_USERNAME\", \"password\": \"newpass\"}"
+RESPONSE=$(curl -s -X POST "$BASE_URL/api/users/register" -H "$CONTENT_TYPE" -d "{\"username\": \"$JWT_USERNAME\", \"password\": \"newpass\"}" 2>/dev/null)
+print_response "$RESPONSE"
+if echo "$RESPONSE" | grep -q '"code":500\|用户名已存在'; then
+    log_pass "正确拒绝重复注册"
+else
+    log_fail "应该拒绝重复用户名"
+fi
+
+print_test "错误密码登录 (应失败)"
+print_request "POST" "$BASE_URL/api/users/login" "{\"username\": \"$JWT_USERNAME\", \"password\": \"wrongpassword\"}"
+RESPONSE=$(curl -s -X POST "$BASE_URL/api/users/login" -H "$CONTENT_TYPE" -d "{\"username\": \"$JWT_USERNAME\", \"password\": \"wrongpassword\"}" 2>/dev/null)
+print_response "$RESPONSE"
+if echo "$RESPONSE" | grep -q '"code":500\|密码错误'; then
+    log_pass "正确拒绝错误密码"
+else
+    log_fail "应该拒绝错误密码"
+fi
+
+# =============================================================================
 # 网关路由测试
 # =============================================================================
 
