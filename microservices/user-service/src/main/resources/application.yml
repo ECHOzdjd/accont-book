@@ -1,5 +1,10 @@
 server:
   port: 8081
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 spring:
   application:
@@ -38,4 +43,4 @@ logging:
 # JWT Configuration
 jwt:
   secret: accont-book-jwt-secret-key-for-signing-tokens-2024
-  expiration: 86400000  # 24 hours in milliseconds
+  expiration: 86400000 # 24 hours in milliseconds

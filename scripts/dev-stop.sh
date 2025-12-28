@@ -29,7 +29,7 @@ for pid_file in "$MICROSERVICES_DIR/logs"/*.pid; do
 done
 
 # 备选：按端口杀进程
-ports=(9000 8081 8082 8083 8084)
+ports=(9000 8081 8082 8083 8084 5173)
 for port in "${ports[@]}"; do
     pid=$(lsof -ti:$port 2>/dev/null)
     if [ -n "$pid" ]; then

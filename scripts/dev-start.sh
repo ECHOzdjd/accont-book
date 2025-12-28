@@ -25,7 +25,7 @@ MICROSERVICES_DIR="$PROJECT_ROOT/microservices"
 mkdir -p "$MICROSERVICES_DIR/logs"
 
 # 1. 启动基础设施
-echo -e "${GREEN}[1/4] 启动基础设施...${NC}"
+echo -e "${GREEN}[1/5] 启动基础设施...${NC}"
 cd "$PROJECT_ROOT"
 docker compose -f docker-compose.microservices.yml up -d mysql nacos rabbitmq
 
@@ -42,7 +42,7 @@ done
 echo ""
 
 # 2. 检查JAR文件
-echo -e "${GREEN}[2/4] 检查JAR文件...${NC}"
+echo -e "${GREEN}[2/5] 检查JAR文件...${NC}"
 NEED_BUILD=false
 for svc in gateway-service user-service asset-service transaction-service statistics-service; do
     jar="$MICROSERVICES_DIR/$svc/target/$svc-1.0.0-SNAPSHOT.jar"
@@ -60,7 +60,7 @@ fi
 
 # 3. 启动微服务
 echo ""
-echo -e "${GREEN}[3/4] 启动微服务...${NC}"
+echo -e "${GREEN}[3/5] 启动微服务...${NC}"
 cd "$MICROSERVICES_DIR"
 
 echo "  启动 gateway-service (9000)..."
@@ -81,15 +81,29 @@ sleep 10
 echo "  启动 statistics-service (8084)..."
 java -jar statistics-service/target/statistics-service-1.0.0-SNAPSHOT.jar > logs/statistics.log 2>&1 &
 
-# 4. 等待服务就绪
+# 4. 启动前端
 echo ""
-echo -e "${GREEN}[4/4] 等待服务就绪...${NC}"
+echo -e "${GREEN}[4/5] 启动前端...${NC}"
+FRONTEND_DIR="$PROJECT_ROOT/accont-book-frontend"
+cd "$FRONTEND_DIR"
+
+if [ ! -d "node_modules" ]; then
+    echo -e "${YELLOW}安装前端依赖...${NC}"
+    npm install
+fi
+
+echo "  启动前端开发服务器 (5173)..."
+npm run dev > "$MICROSERVICES_DIR/logs/frontend.log" 2>&1 &
+
+# 5. 等待服务就绪
+echo ""
+echo -e "${GREEN}[5/5] 等待服务就绪...${NC}"
 sleep 15
 
 echo ""
 echo "===== 服务状态 ====="
-for port in 9000 8081 8082 8083 8084; do
-    if curl -s "http://localhost:$port/actuator/health" | grep -q "UP"; then
+for port in 9000 8081 8082 8083 8084 5173; do
+    if lsof -i:$port > /dev/null 2>&1 || curl -s "http://localhost:$port" > /dev/null 2>&1; then
         echo -e "  端口 $port: ${GREEN}✓ 运行中${NC}"
     else
         echo -e "  端口 $port: ${RED}✗ 未就绪${NC}"
@@ -98,6 +112,7 @@ done
 
 echo ""
 echo "===== 服务端点 ====="
+echo "  前端:     http://localhost:5173"
 echo "  网关:     http://localhost:9000"
 echo "  用户:     http://localhost:8081"
 echo "  资产:     http://localhost:8082"
