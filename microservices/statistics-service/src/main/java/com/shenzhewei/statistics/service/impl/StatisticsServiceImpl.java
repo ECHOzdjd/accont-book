@@ -1,11 +1,15 @@
 package com.shenzhewei.statistics.service.impl;
 
+import com.shenzhewei.common.api.dto.CategoryStatisticsDTO;
+import com.shenzhewei.common.api.feign.TransactionFeignClient;
+import com.shenzhewei.common.core.Result;
 import com.shenzhewei.statistics.entity.CategoryStatistics;
+import com.shenzhewei.statistics.entity.DailyStatistics;
 import com.shenzhewei.statistics.entity.MonthlyStatistics;
+import com.shenzhewei.statistics.mapper.StatisticsMapper;
 import com.shenzhewei.statistics.service.StatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -15,134 +19,141 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 统计服务实现
- * 通过SQL聚合计算统计数据
+ * 优化为使用预计算表查询，提升性能
+ * 分类统计通过 Feign 调用 transaction-service
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class StatisticsServiceImpl implements StatisticsService {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final StatisticsMapper statisticsMapper;
+    private final TransactionFeignClient transactionFeignClient;
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
     @Override
     public void updateStatistics(Long userId, Long transactionId) {
-        // 此方法由消息触发，可以用于预计算和缓存统计数据
-        // 当前实现采用实时查询，后续可优化为预计算
-        log.info("统计数据更新触发: userId={}, transactionId={}", userId, transactionId);
+        // 此方法已被消息驱动的预计算取代，保留接口兼容性
+        log.info("统计数据更新触发（已迁移至消息驱动）: userId={}, transactionId={}", userId, transactionId);
     }
 
     @Override
     public List<MonthlyStatistics> getMonthlyStatistics(Long userId, int months) {
-        String sql = """
-            SELECT 
-                DATE_FORMAT(trans_time, '%Y-%m') as month,
-                SUM(CASE WHEN type = 2 THEN amount ELSE 0 END) as total_income,
-                SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as total_expense,
-                COUNT(*) as transaction_count
-            FROM tb_transaction 
-            WHERE user_id = ? 
-                AND trans_time >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-            GROUP BY DATE_FORMAT(trans_time, '%Y-%m')
-            ORDER BY month DESC
-            """;
-
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, userId, months);
+        // 计算查询的日期范围
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.minusMonths(months);
+        
+        // 从预计算表查询
+        List<DailyStatistics> dailyStats = statisticsMapper.findByDateRange(userId, startDate, endDate);
+        
+        // 按月聚合
+        Map<String, List<DailyStatistics>> monthlyGroups = dailyStats.stream()
+                .collect(Collectors.groupingBy(stat -> 
+                    stat.getStatDate().format(MONTH_FORMATTER)));
         
         List<MonthlyStatistics> result = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            BigDecimal income = (BigDecimal) row.get("total_income");
-            BigDecimal expense = (BigDecimal) row.get("total_expense");
+        for (Map.Entry<String, List<DailyStatistics>> entry : monthlyGroups.entrySet()) {
+            String month = entry.getKey();
+            List<DailyStatistics> stats = entry.getValue();
+            
+            BigDecimal totalIncome = stats.stream()
+                    .map(DailyStatistics::getTotalIncome)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalExpense = stats.stream()
+                    .map(DailyStatistics::getTotalExpense)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            int transCount = stats.stream()
+                    .mapToInt(DailyStatistics::getTransCount)
+                    .sum();
             
             result.add(MonthlyStatistics.builder()
                     .userId(userId)
-                    .month((String) row.get("month"))
-                    .totalIncome(income)
-                    .totalExpense(expense)
-                    .netAmount(income.subtract(expense))
-                    .transactionCount(((Number) row.get("transaction_count")).intValue())
+                    .month(month)
+                    .totalIncome(totalIncome)
+                    .totalExpense(totalExpense)
+                    .netAmount(totalIncome.subtract(totalExpense))
+                    .transactionCount(transCount)
                     .build());
         }
+        
+        // 按月份降序排序
+        result.sort((a, b) -> b.getMonth().compareTo(a.getMonth()));
         
         return result;
     }
 
     @Override
     public List<CategoryStatistics> getCategoryStatistics(Long userId, String month, Integer type) {
-        String sql = """
-            SELECT 
-                category,
-                type,
-                SUM(amount) as total_amount,
-                COUNT(*) as transaction_count
-            FROM tb_transaction 
-            WHERE user_id = ? 
-                AND DATE_FORMAT(trans_time, '%Y-%m') = ?
-                AND (? IS NULL OR type = ?)
-            GROUP BY category, type
-            ORDER BY total_amount DESC
-            """;
-
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, userId, month, type, type);
+        // 通过 Feign 调用 transaction-service 获取分类统计数据
+        log.info("通过 Feign 调用 transaction-service 获取分类统计: userId={}, month={}, type={}", 
+                 userId, month, type);
+        
+        Result<List<CategoryStatisticsDTO>> result = transactionFeignClient.getCategoryStatistics(userId, month, type);
+        
+        if (result.getCode() != 200 || result.getData() == null) {
+            log.warn("调用 transaction-service 失败: code={}, message={}", result.getCode(), result.getMessage());
+            return new ArrayList<>();
+        }
+        
+        List<CategoryStatisticsDTO> dtoList = result.getData();
         
         // 计算总金额用于百分比
-        BigDecimal totalSum = rows.stream()
-                .map(row -> (BigDecimal) row.get("total_amount"))
+        BigDecimal totalSum = dtoList.stream()
+                .map(CategoryStatisticsDTO::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<CategoryStatistics> result = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            BigDecimal amount = (BigDecimal) row.get("total_amount");
+        // 转换为 CategoryStatistics 并计算百分比
+        List<CategoryStatistics> statisticsList = new ArrayList<>();
+        for (CategoryStatisticsDTO dto : dtoList) {
             double percentage = totalSum.compareTo(BigDecimal.ZERO) > 0 
-                    ? amount.divide(totalSum, 4, RoundingMode.HALF_UP).doubleValue() * 100 
+                    ? dto.getTotalAmount().divide(totalSum, 4, RoundingMode.HALF_UP).doubleValue() * 100 
                     : 0;
             
-            result.add(CategoryStatistics.builder()
-                    .userId(userId)
-                    .category((String) row.get("category"))
-                    .type((Integer) row.get("type"))
-                    .totalAmount(amount)
-                    .transactionCount(((Number) row.get("transaction_count")).intValue())
+            statisticsList.add(CategoryStatistics.builder()
+                    .userId(dto.getUserId())
+                    .category(dto.getCategory())
+                    .type(dto.getType())
+                    .totalAmount(dto.getTotalAmount())
+                    .transactionCount(dto.getTransactionCount())
                     .percentage(percentage)
                     .build());
         }
         
-        return result;
+        log.info("分类统计数据获取成功: count={}", statisticsList.size());
+        return statisticsList;
     }
 
     @Override
     public MonthlyStatistics getCurrentMonthSummary(Long userId) {
-        String currentMonth = LocalDate.now().format(MONTH_FORMATTER);
+        // 使用预计算表查询当月汇总
+        LocalDate now = LocalDate.now();
+        int year = now.getYear();
+        int month = now.getMonthValue();
+        String currentMonth = now.format(MONTH_FORMATTER);
         
-        String sql = """
-            SELECT 
-                SUM(CASE WHEN type = 2 THEN amount ELSE 0 END) as total_income,
-                SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as total_expense,
-                COUNT(*) as transaction_count
-            FROM tb_transaction 
-            WHERE user_id = ? 
-                AND DATE_FORMAT(trans_time, '%Y-%m') = ?
-            """;
-
-        Map<String, Object> row = jdbcTemplate.queryForMap(sql, userId, currentMonth);
+        List<DailyStatistics> dailyStats = statisticsMapper.findByMonth(userId, year, month);
         
-        BigDecimal income = row.get("total_income") != null 
-                ? (BigDecimal) row.get("total_income") 
-                : BigDecimal.ZERO;
-        BigDecimal expense = row.get("total_expense") != null 
-                ? (BigDecimal) row.get("total_expense") 
-                : BigDecimal.ZERO;
+        BigDecimal totalIncome = dailyStats.stream()
+                .map(DailyStatistics::getTotalIncome)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalExpense = dailyStats.stream()
+                .map(DailyStatistics::getTotalExpense)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        int transCount = dailyStats.stream()
+                .mapToInt(DailyStatistics::getTransCount)
+                .sum();
         
         return MonthlyStatistics.builder()
                 .userId(userId)
                 .month(currentMonth)
-                .totalIncome(income)
-                .totalExpense(expense)
-                .netAmount(income.subtract(expense))
-                .transactionCount(((Number) row.get("transaction_count")).intValue())
+                .totalIncome(totalIncome)
+                .totalExpense(totalExpense)
+                .netAmount(totalIncome.subtract(totalExpense))
+                .transactionCount(transCount)
                 .build();
     }
 }

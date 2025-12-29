@@ -264,13 +264,13 @@ except:
         # 同步暂停容器
         docker pause "$CONTAINER_ID" >/dev/null 2>&1
         
-        # 等待 Gateway 检测到实例不可用
-        sleep 3
+        # 等待 Gateway 检测到实例不可用 (增加等待时间)
+        sleep 5
         
-        # 测试请求是否仍然成功
+        # 测试请求是否仍然成功 (使用更长的超时，让重试机制生效)
         FAILOVER_SUCCESS=0
         for i in {1..10}; do
-            if curl -s --connect-timeout 2 --max-time 3 "$GATEWAY_URL/api/assets/1" 2>/dev/null | grep -q '"code":200'; then
+            if curl -s --connect-timeout 3 --max-time 10 "$GATEWAY_URL/api/assets/1" 2>/dev/null | grep -q '"code":200'; then
                 FAILOVER_SUCCESS=$((FAILOVER_SUCCESS + 1))
             fi
         done

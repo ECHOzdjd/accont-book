@@ -20,7 +20,7 @@ spring:
         port: 8719
       eager: true
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/accont_book?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/accont_transaction?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${MYSQL_USER:accont}
     password: ${MYSQL_PASSWORD:accont123}
     driver-class-name: com.mysql.cj.jdbc.Driver

@@ -2,6 +2,7 @@ package com.shenzhewei.transaction.service.impl;
 
 import com.shenzhewei.common.api.dto.AssetDTO;
 import com.shenzhewei.common.api.dto.BalanceChangeRequest;
+import com.shenzhewei.common.api.dto.CategoryStatisticsDTO;
 import com.shenzhewei.common.api.dto.TransactionDTO;
 import com.shenzhewei.common.api.feign.AssetFeignClient;
 import com.shenzhewei.common.core.Result;
@@ -13,12 +14,15 @@ import com.shenzhewei.transaction.mq.TransactionMessageSender;
 import com.shenzhewei.transaction.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 交易服务实现
@@ -32,6 +36,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final TransactionMapper transactionMapper;
     private final AssetFeignClient assetFeignClient;
     private final TransactionMessageSender messageSender;
+    private final JdbcTemplate jdbcTemplate;
 
     /**
      * 新增记账
@@ -132,5 +137,45 @@ public class TransactionServiceImpl implements TransactionService {
 
         log.info("流水删除成功，余额已回滚: transactionId={}, assetId={}",
                 id, transaction.getAssetId());
+    }
+
+    /**
+     * 获取分类统计数据
+     * 通过SQL聚合计算各分类的统计数据
+     */
+    @Override
+    public List<CategoryStatisticsDTO> getCategoryStatistics(Long userId, String month, Integer type) {
+        String sql = """
+            SELECT 
+                category,
+                type,
+                SUM(amount) as total_amount,
+                COUNT(*) as transaction_count
+            FROM tb_transaction 
+            WHERE user_id = ? 
+                AND DATE_FORMAT(trans_time, '%Y-%m') = ?
+                AND (? IS NULL OR type = ?)
+                AND is_deleted = 0
+            GROUP BY category, type
+            ORDER BY total_amount DESC
+            """;
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, userId, month, type, type);
+        
+        List<CategoryStatisticsDTO> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            result.add(CategoryStatisticsDTO.builder()
+                    .userId(userId)
+                    .category((String) row.get("category"))
+                    .type((Integer) row.get("type"))
+                    .totalAmount((BigDecimal) row.get("total_amount"))
+                    .transactionCount(((Number) row.get("transaction_count")).intValue())
+                    .build());
+        }
+        
+        log.info("分类统计查询成功: userId={}, month={}, type={}, count={}", 
+                 userId, month, type, result.size());
+        
+        return result;
     }
 }
