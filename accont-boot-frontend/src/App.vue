@@ -9,7 +9,8 @@ const router = useRouter()
 const menuItems = [
   { path: '/', title: '首页', icon: 'HomeFilled' },
   { path: '/assets', title: '资产管理', icon: 'Wallet' },
-  { path: '/transactions', title: '记账流水', icon: 'List' }
+  { path: '/transactions', title: '记账流水', icon: 'List' },
+  { path: '/ai-analysis', title: 'AI分析', icon: 'DataAnalysis' }
 ]
 
 const activeMenu = computed(() => route.path)

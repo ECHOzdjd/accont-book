@@ -30,6 +30,12 @@ const routes = [
     name: 'Transactions',
     component: () => import('@/views/Transactions.vue'),
     meta: { title: '记账流水', icon: 'List', requiresAuth: true }
+  },
+  {
+    path: '/ai-analysis',
+    name: 'AIAnalysis',
+    component: () => import('@/views/AIAnalysis.vue'),
+    meta: { title: 'AI分析', icon: 'DataAnalysis', requiresAuth: true }
   }
 ]
 

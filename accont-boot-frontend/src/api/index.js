@@ -5,7 +5,7 @@ import router from '@/router'
 // 创建axios实例
 const api = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 90000, // AI分析需要更长时间
 })
 
 // 请求拦截器
@@ -134,6 +134,16 @@ export const addTransaction = (data) => {
  */
 export const deleteTransaction = (id) => {
   return api.delete(`/transactions/${id}`)
+}
+
+// ============ AI 分析 API ============
+
+/**
+ * AI 账本分析
+ * @param {Object} data { type, timeRange }
+ */
+export const analyze = (data) => {
+  return api.post('/ai/analyze', data)
 }
 
 export default api
