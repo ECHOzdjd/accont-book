@@ -33,7 +33,7 @@ logging:
 # DeepSeek AI Configuration
 deepseek:
   api:
-    key: sk-1cb8de7c70f7454bb53f10422c6a00aa
+    key: your-deepseek-api-key
     base-url: https://api.deepseek.com/v1
     model: deepseek-chat
     timeout: 60000
